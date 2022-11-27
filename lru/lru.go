@@ -57,25 +57,6 @@ func (c *Cache) Get(key string) (value Value, ok bool) {
 	return
 }
 
-// 删除，实际上是缓存淘汰。即移除最近最少访问的节点（队首）
-func (c *Cache) RemoveOldest() {
-	// 返回列表ll的最后一个元素，如果列表为空则返回nil
-	ele := c.ll.Back()
-	if ele != nil {
-		// 从链表中删除
-		c.ll.Remove(ele)
-		// 获取map的key,从map中删除
-		kv := ele.Value.(*entry)
-		delete(c.cache, kv.key)
-		// 更新当前所用的内存
-		c.nbytes -= int64(len(kv.key)) + int64(kv.value.Len())
-		// 如果回调函数 OnEvicted 不为 nil，则调用回调函数
-		if c.OnEvicted != nil {
-			c.OnEvicted(kv.key, kv.value)
-		}
-	}
-}
-
 // 新增或者修改
 func (c *Cache) Add(key string, value Value) {
 	// 如果键存在，则更新对应节点的值，并将该节点移到队尾。
@@ -98,6 +79,25 @@ func (c *Cache) Add(key string, value Value) {
 	// 类似于for死循环中判断最大内存是否小于所占内存，一直删除，直到不符合条件再退出for循环
 	for c.maxBytes != 0 && c.maxBytes < c.nbytes {
 		c.RemoveOldest()
+	}
+}
+
+// 删除，实际上是缓存淘汰。即移除最近最少访问的节点（队首）
+func (c *Cache) RemoveOldest() {
+	// 返回列表ll的最后一个元素，如果列表为空则返回nil
+	ele := c.ll.Back()
+	if ele != nil {
+		// 从链表中删除
+		c.ll.Remove(ele)
+		// 获取map的key,从map中删除
+		kv := ele.Value.(*entry)
+		delete(c.cache, kv.key)
+		// 更新当前所用的内存
+		c.nbytes -= int64(len(kv.key)) + int64(kv.value.Len())
+		// 如果回调函数 OnEvicted 不为 nil，则调用回调函数
+		if c.OnEvicted != nil {
+			c.OnEvicted(kv.key, kv.value)
+		}
 	}
 }
 
