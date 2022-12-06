@@ -3,7 +3,7 @@ package geecache
 import (
 	"sync"
 
-	"github.com/XiaoNuoZ/gee-cache/lru"
+	"gee-cache/geecache/lru"
 )
 
 // 实例化lru,增加互斥锁，封装add和get方法
