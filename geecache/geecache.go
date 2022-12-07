@@ -71,6 +71,7 @@ func (g *Group) Get(key string) (ByteView, error) {
 		return ByteView{}, fmt.Errorf("key is required")
 	}
 
+	// 从当前节点的缓存中获取值
 	if v, ok := g.mainCache.get(key); ok {
 		log.Println("[GeeCache] hit")
 		return v, nil
@@ -93,6 +94,7 @@ func (g *Group) load(key string) (value ByteView, err error) {
 		// 获取http请求，其中存有远端url地址
 		if peer, ok := g.peers.PickPeer(key); ok {
 			// 获取远端值，获取不到从本地获取
+			// 当客户端请求到服务端时，哈希环中根据key获取的真实节点与当前服务器节点相等，因此会返回false，改为从当前节点的db中获取值
 			if value, err = g.getFromPeer(peer, key); err == nil {
 				return value, nil
 			}

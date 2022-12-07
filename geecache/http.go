@@ -39,7 +39,7 @@ func (p *HTTPPool) Log(format string, v ...interface{}) {
 	log.Printf("[Server %s] %s", p.self, fmt.Sprintf(format, v...))
 }
 
-// ServeHTTP handle all http requests
+// ServeHTTP如果设置为ListenAndServe的第二个参数，那它会接管每一个http请求
 func (p *HTTPPool) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// 判断地址是否是cache地址
 	if !strings.HasPrefix(r.URL.Path, p.basePath) {
