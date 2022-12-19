@@ -2,6 +2,7 @@ package geecache
 
 import (
 	"fmt"
+	"gee-cache/geecache/singleflight"
 	"log"
 	"sync"
 )
@@ -32,6 +33,8 @@ type Group struct {
 	getter    Getter
 	mainCache cache
 	peers     PeerPicker
+	// 使用singleflight.Group来确保每个键在同一时刻只获取一次
+	loader *singleflight.Group
 }
 
 var (
@@ -51,6 +54,7 @@ func NewGroup(name string, cacheBytes int64, getter Getter) *Group {
 		name:      name,
 		getter:    getter,
 		mainCache: cache{cacheBytes: cacheBytes},
+		loader:    &singleflight.Group{},
 	}
 	groups[name] = g
 	return g
@@ -89,20 +93,26 @@ func (g *Group) RegisterPeers(peers PeerPicker) {
 }
 
 func (g *Group) load(key string) (value ByteView, err error) {
-	// 先从远端获取数据
-	if g.peers != nil {
-		// 获取http请求，其中存有远端url地址
-		if peer, ok := g.peers.PickPeer(key); ok {
-			// 获取远端值，获取不到从本地获取
-			// 当客户端请求到服务端时，哈希环中根据key获取的真实节点与当前服务器节点相等，因此会返回false，改为从当前节点的db中获取值
-			if value, err = g.getFromPeer(peer, key); err == nil {
-				return value, nil
+	// 使用Do 确保并发场景下针对相同的 key，load 过程只会调用一次
+	viewi, err := g.loader.Do(key, func() (interface{}, error) {
+		// 先从远端获取数据
+		if g.peers != nil {
+			// 获取http请求，其中存有远端url地址
+			if peer, ok := g.peers.PickPeer(key); ok {
+				// 获取远端值，获取不到从本地获取
+				// 当客户端请求到服务端时，哈希环中根据key获取的真实节点与当前服务器节点相等，因此会返回false，改为从当前节点的db中获取值
+				if value, err = g.getFromPeer(peer, key); err == nil {
+					return value, nil
+				}
+				log.Println("[GeeCache] Failed to get from peer", err)
 			}
-			log.Println("[GeeCache] Failed to get from peer", err)
 		}
+		return g.getLocally(key)
+	})
+	if err == nil {
+		return viewi.(ByteView), nil
 	}
-
-	return g.getLocally(key)
+	return
 }
 
 func (g *Group) populateCache(key string, value ByteView) {
